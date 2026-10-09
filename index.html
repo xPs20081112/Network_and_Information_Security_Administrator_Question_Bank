@@ -21,7 +21,7 @@ body>.dialog-shade{z-index:300;}
 <section class="container">
 <div class="section-title">学习统计</div>
 <div class="stat-grid" id="homeStats"></div>
-<div class="summary-small">正确率仅以已判题目为分母；未作答题目不计入。考试模式在交卷后统计。</div>
+<div class="summary-small">正确率按整个题库计算：答对题数 ÷ 题库总题数；未作答题目按未答对计入分母。考试模式在交卷后统计。</div>
 </section>
 <section class="container">
 <div class="section-title">开始练习</div>
@@ -77,9 +77,10 @@ function renderStats(){
  const stats={choice:{a:0,c:0},judgment:{a:0,c:0},multi:{a:0,c:0},fill:{a:0,c:0}};
  const map=new Map(BANK_META.map(q=>[q.id,q]));
  for(const [id,rec] of Object.entries(sourceAnswers||{})){const q=map.get(id);if(!q||!answered(rec))continue;stats[q.type].a++;if(rec.correct)stats[q.type].c++;}
- const allA=Object.values(stats).reduce((s,x)=>s+x.a,0), allC=Object.values(stats).reduce((s,x)=>s+x.c,0);
- const cards=[['总体正确率',rateText(allC,allA),`${allA} 道已判题`,true]];
- for(const t of ['choice','multi','judgment','fill']) if(TYPE_COUNT[t]>0) cards.push([TYPE_NAMES[t],TYPE_COUNT[t]+' 道', '正确率 '+rateText(stats[t].c,stats[t].a),false]);
+ const allC=Object.values(stats).reduce((s,x)=>s+x.c,0);
+ const allTotal=Object.values(TYPE_COUNT).reduce((s,n)=>s+n,0);
+ const cards=[['题库整体正确率',rateText(allC,allTotal),`${allC} / ${allTotal} 道答对`,true]];
+ for(const t of ['choice','multi','judgment','fill']) if(TYPE_COUNT[t]>0) cards.push([TYPE_NAMES[t],rateText(stats[t].c,TYPE_COUNT[t]),`${stats[t].c} / ${TYPE_COUNT[t]} 道答对`,false]);
  document.getElementById('homeStats').innerHTML=cards.map(c=>`<div class="stat-card"><div class="stat-label">${c[0]}</div><div class="stat-num">${c[1]}</div><div class="stat-foot">${c[2]}</div></div>`).join('');
 }
 function startMode(mode){
