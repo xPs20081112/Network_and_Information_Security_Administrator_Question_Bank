@@ -50,6 +50,9 @@ function render(){
  const out=document.getElementById('resultContent');const result=get(LAST_KEY);
  if(!result||!Array.isArray(result.questionIds)){out.innerHTML='<section class="card"><div class="empty">暂无上一次交卷记录。完成一次测验并点击“交卷”后，这里会显示做题详情。</div></section>';return;}
  const allMap=new Map(BANK_META.map(q=>[q.id,q]));
+ const bankCounts={choice:0,multi:0,judgment:0,fill:0};
+ for(const q of BANK_META){if(Object.prototype.hasOwnProperty.call(bankCounts,q.type))bankCounts[q.type]++;}
+ const bankTotal=Object.values(bankCounts).reduce((sum,n)=>sum+n,0);
  const ids=[...new Set(result.questionIds)].filter(id=>allMap.has(id));
  const groups={choice:[],multi:[],judgment:[],fill:[]};
  for(const id of ids){const q=allMap.get(id);if(groups[q.type])groups[q.type].push(q);}
@@ -63,12 +66,12 @@ function render(){
    graded+=a;correct+=c;wrong+=w;stats.push({key,total:qs.length,answered:a,correct:c,wrong:w});
  }
  const shownStats=result.mode==='wrong'?stats.filter(x=>x.wrong>0):stats;
- const statsHtml=shownStats.length?shownStats.map(x=>`<div class="stat"><div class="stat-label">${TYPE_NAMES[x.key]}</div><div class="stat-num">${pct(x.correct,x.answered)}</div><div class="stat-foot">已判 ${x.answered} / 涉及 ${x.total} 题</div></div>`).join(''):'<div class="muted">暂无可统计数据</div>';
- const totalRate=pct(correct,graded);
+ const statsHtml=shownStats.length?shownStats.map(x=>`<div class="stat"><div class="stat-label">${TYPE_NAMES[x.key]}</div><div class="stat-num">${pct(x.correct,bankCounts[x.key]||0)}</div><div class="stat-foot">答对 ${x.correct} / 题库共 ${bankCounts[x.key]||0} 题（已判 ${x.answered}）</div></div>`).join(''):'<div class="muted">暂无可统计数据</div>';
+ const totalRate=pct(correct,bankTotal);
  let groupHtml='';for(const key of TYPE_ORDER){const qs=groups[key];if(!qs.length)continue;groupHtml+=`<section class="q-group"><h3>${TYPE_NAMES[key]}（${qs.length} 题）</h3><div class="q-list">`+qs.map(q=>{const rec=answers[q.id];let cls='q-item';if(answered(rec))cls+=' '+(rec.correct?'correct':'wrong');if(pins.has(q.id))cls+=' pinned';return `<button class="${cls}" type="button" onclick="jumpQuestion('${q.id}')" title="点击返回此题并查看解析">${label(q)}</button>`}).join('')+'</div></section>';}
  const pinnedQs=ids.map(id=>allMap.get(id)).filter(q=>pins.has(q.id));
  const pinsHtml=pinnedQs.length?pinnedQs.map(q=>`<button type="button" class="pin-chip" onclick="jumpQuestion('${q.id}')">${label(q)} · ${TYPE_NAMES[q.type]}</button>`).join(''):'<div class="muted">本次没有图钉题目</div>';
- out.innerHTML=`<div class="layout"><div><section class="card"><h2>本次测验</h2><div class="line"><span>交卷时间</span><span>${safeText(result.submittedAt||'未提供')}</span></div><div class="line"><span>测验类型</span><span>${modeName(result.mode)}</span></div><div class="line"><span>用时</span><span>${safeText(result.time||'00:00:00')}</span></div><div class="line"><span>总体正确率</span><strong>${totalRate}</strong></div><div class="line"><span>已判题目</span><span>${graded} / 涉及 ${ids.length} 题</span></div><div class="stats">${statsHtml}</div><div class="legend"><span class="lg-correct">正确</span><span class="lg-wrong">错误</span><span>白色：未判题</span><span class="lg-pin">图钉题</span></div></section></div><aside><section class="card"><h2>图钉题目</h2><div class="pin-list">${pinsHtml}</div></section><section class="card"><h2>本次题目编号</h2><div class="groups">${groupHtml||'<div class="empty">本次没有记录题目。</div>'}</div></section></aside></div>`;
+ out.innerHTML=`<div class="layout"><div><section class="card"><h2>本次测验</h2><div class="line"><span>交卷时间</span><span>${safeText(result.submittedAt||'未提供')}</span></div><div class="line"><span>测验类型</span><span>${modeName(result.mode)}</span></div><div class="line"><span>用时</span><span>${safeText(result.time||'00:00:00')}</span></div><div class="line"><span>总体正确率</span><strong>${totalRate}</strong></div><div class="line"><span>已判题目</span><span>${correct} / 题库共 ${bankTotal} 题答对（本次已判 ${graded} 题）</span></div><div class="stats">${statsHtml}</div><div class="legend"><span class="lg-correct">正确</span><span class="lg-wrong">错误</span><span>白色：未判题</span><span class="lg-pin">图钉题</span></div></section></div><aside><section class="card"><h2>图钉题目</h2><div class="pin-list">${pinsHtml}</div></section><section class="card"><h2>本次题目编号</h2><div class="groups">${groupHtml||'<div class="empty">本次没有记录题目。</div>'}</div></section></aside></div>`;
 }
 render();
 </script>
