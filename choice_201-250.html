@@ -156,9 +156,14 @@ function makeSnapshot() {
   return {schema:'quiz_snapshot_v2', savedAt:Date.now(), progress:progress, lastResult:lastResult};
 }
 function urlWithState(file, focusId) {
-  const state = encodeSnapshot(makeSnapshot());
   const params = new URLSearchParams();
-  if (state && state.length < 250000) params.set('state', state);
+  // GitHub Pages and other HTTP(S) hosts share same-origin localStorage across pages.
+  // Keep navigation URLs short: never serialize the full answer history into a query string.
+  // Retain the legacy snapshot only for direct file:// use, where storage sharing varies by browser.
+  if (location.protocol === 'file:') {
+    const state = encodeSnapshot(makeSnapshot());
+    if (state && state.length < 250000) params.set('state', state);
+  }
   if (focusId) params.set('focus', focusId);
   return file + (params.toString() ? '?' + params.toString() : '');
 }
@@ -178,9 +183,18 @@ function persistContext(touch=true, syncUrl=false) {
 }
 function updateUrlSnapshot() {
   try {
+    const url = new URL(location.href);
+    // On hosted deployments, progress is persisted in same-origin storage. Remove any
+    // legacy snapshot parameter instead of growing the URL as answers accumulate.
+    if (location.protocol !== 'file:') {
+      if (url.searchParams.has('state')) {
+        url.searchParams.delete('state');
+        history.replaceState(null, '', url.href);
+      }
+      return;
+    }
     const encoded = encodeSnapshot(makeSnapshot());
     if (!encoded || encoded.length >= 250000) return;
-    const url = new URL(location.href);
     url.searchParams.set('state', encoded);
     history.replaceState(null, '', url.href);
   } catch (_) { /* storage and snapshots remain best-effort */ }
@@ -191,12 +205,17 @@ function updateStorageNote() {
   const target = node || homeNode;
   if (!target) return;
   target.classList.add('notice');
+  const isFileProtocol = location.protocol === 'file:';
   if (!storageUsable || storageWriteFailed) {
     target.classList.add('error');
-    target.textContent = '当前浏览器的本地存储不可用或写入失败。页面导航会尝试通过链接快照传递进度；请尽量从当前页面继续操作，并在首页导出 JSON 备份。刷新或另开文件可能无法恢复最近状态。';
+    target.textContent = isFileProtocol
+      ? '当前浏览器的本地存储不可用或写入失败。file:// 模式会尝试通过链接快照传递进度；请尽量从当前页面继续操作，并在首页导出 JSON 备份。'
+      : '当前浏览器的本地存储不可用或写入失败。线上网站依赖浏览器本地存储在各页面间保存进度；请启用本地存储，并在首页导出 JSON 备份。';
   } else {
     target.classList.remove('error');
-    target.textContent = '本项目可直接打开运行。注意：浏览器对 file:// 下不同 HTML 的本地存储共享规则可能不同；页面间导航会附带进度快照，如手动另开文件发现不同步，请在首页使用导出/导入进度。';
+    target.textContent = isFileProtocol
+      ? '直接打开本地 HTML 时，不同浏览器对 file:// 的本地存储共享规则可能不同；页面间会尽量附带进度快照，建议从当前页面继续操作。'
+      : '进度保存在当前网站的浏览器本地存储中，页面跳转只传递题目定位参数，不会把完整答题记录写入网址。清理浏览器数据或更换设备前，请先导出 JSON 备份。';
   }
 }
 function nowMs() { return Date.now(); }
