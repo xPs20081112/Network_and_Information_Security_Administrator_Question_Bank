@@ -54,8 +54,10 @@ function shuffled(arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j
 function makeExamSession(){const now=Date.now();const questionOrders={};const optionOrders={};for(const r of ROUTES){questionOrders[r.file]=shuffled(routeIds(r))}for(const q of ALL_QUESTIONS){if(q.type==="choice"||q.type==="multi")optionOrders[q.id]=shuffled(Object.keys(q.options))}return {schema:2,sessionId:"exam-"+now.toString(36)+"-"+Math.random().toString(36).slice(2,8),createdAt:now,questionOrders,optionOrders,elapsedMs:0,timerRunning:true,timerStartedAt:now}}
 function makeProgress(mode,previousStats){const now=Date.now();let wrongIds=[];const last=getResult();if(mode==="wrong"&&last)wrongIds=Array.isArray(last.wrongIds)?last.wrongIds.slice():[];const possible=ROUTES.filter(r=>mode!=="wrong"||r.ids.some(id=>wrongIds.includes(id)));const first=possible[0]||ROUTES[0];let currentId=first.ids.find(id=>mode!=="wrong"||wrongIds.includes(id))||first.ids[0];return {schema:2,active:true,mode,answers:{},stats:previousStats||{},pins:[],currentFile:first.file,currentId,elapsedMs:0,timerRunning:true,timerStartedAt:now,wrongIds,createdAt:now,completed:false}}
 function launchMode(mode){const old=getProgress();if(mode==="wrong"){const r=getResult();const wrong=r&&Array.isArray(r.wrongIds)?r.wrongIds:[];if(!wrong.length){alert("暂无数据：上一次考试没有错题。");return}}
-if(old.active){if(!confirm("当前已有刷题进度。开始新模式将覆盖当前会话，但会保留首页已累计的正确率统计。是否继续？"))return}
-const p=makeProgress(mode,old.stats||{});if(mode==="exam"){const session=makeExamSession();session.elapsedMs=0;session.timerRunning=true;session.timerStartedAt=Date.now();const firstExamId=session.questionOrders[p.currentFile]?.[0];if(firstExamId)p.currentId=firstExamId;p.openAtTop=true;writeKey(STORAGE_KEYS.exam,session)}else{delete p.openAtTop;removeKey(STORAGE_KEYS.exam)}
+if(old.active){const note=mode==="exam"?"进入考试后，首页正确率暂时保留上一次有效练习/已交卷考试的结果；只有交卷才更新。":"开始新的"+(mode==="practice"?"做题":"错题")+"会话将清空首页旧的正确率统计，只统计本次会话。";if(!confirm("当前已有刷题进度。"+note+"是否继续？"))return}
+// Home statistics represent the most recent valid session, not a lifetime union of question IDs.
+// A newly launched practice/wrong session starts blank. An exam carries the last displayed stats until it is submitted.
+const p=makeProgress(mode,mode==="exam"?(old.stats||{}):{});if(mode==="exam"){const session=makeExamSession();session.elapsedMs=0;session.timerRunning=true;session.timerStartedAt=Date.now();const firstExamId=session.questionOrders[p.currentFile]?.[0];if(firstExamId)p.currentId=firstExamId;p.openAtTop=true;writeKey(STORAGE_KEYS.exam,session)}else{delete p.openAtTop;removeKey(STORAGE_KEYS.exam)}
 if(!saveProgress(p))return;
 try{localStorage.setItem(STORAGE_KEYS.marker,"MuYanQuizV2")}catch(e){}
 location.href=p.currentFile}
@@ -68,5 +70,12 @@ function importProgress(){const raw=$("dataText").value.trim();if(!raw){alert("�
 function resetProgress(){if(!confirm("确定清空本地刷题进度、累计统计、当前考试会话及最近一次测验详情吗？此操作无法撤销。建议先导出备份。"))return;removeKey(STORAGE_KEYS.progress);removeKey(STORAGE_KEYS.exam);removeKey(STORAGE_KEYS.result);renderStats();alert("本地进度已清空。")}
 function init(){updateCountdown();renderStats();const warn=$("storageWarning");if(location.protocol==="file:")warn.classList.remove("hidden");try{localStorage.setItem(STORAGE_KEYS.marker,"MuYanQuizV2")}catch(e){warn.textContent="浏览器禁用了本地存储，刷题进度无法可靠保存。请调整浏览器设置后再使用。";warn.classList.remove("hidden")}}
 document.addEventListener("click",e=>{const b=e.target.closest("[data-action]");if(!b)return;switch(b.dataset.action){case"practice":launchMode("practice");break;case"exam":launchMode("exam");break;case"wrong":launchMode("wrong");break;case"continue":continueProgress();break;case"result":openLastResult();break;case"export":openDialog("export");break;case"import":openDialog("import");break;case"clear":resetProgress();break;case"copy":copyExport();break;case"download":downloadText("quiz_progress.json",$("dataText").value,"application/json;charset=utf-8");break;case"do-import":importProgress();break;case"cancel-dialog":$("dataDialog").close?.();break;case"supplement":if(confirm("是否查看补充信息：思科命令解析？"))location.href="思科命令解析.html";break}});
+// Refresh the home statistics whenever this document becomes visible again.
+// Browsers may restore index.html from the back-forward cache without rerunning init().
+function refreshHomeView(){updateCountdown();renderStats()}
+window.addEventListener("pageshow",refreshHomeView);
+window.addEventListener("focus",refreshHomeView);
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")refreshHomeView()});
+window.addEventListener("storage",e=>{if(!e.key||e.key===STORAGE_KEYS.progress||e.key===STORAGE_KEYS.result)refreshHomeView()});
 init();
 </script></body></html>
