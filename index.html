@@ -55,7 +55,7 @@ function makeExamSession(){const now=Date.now();const questionOrders={};const op
 function makeProgress(mode,previousStats){const now=Date.now();let wrongIds=[];const last=getResult();if(mode==="wrong"&&last)wrongIds=Array.isArray(last.wrongIds)?last.wrongIds.slice():[];const possible=ROUTES.filter(r=>mode!=="wrong"||r.ids.some(id=>wrongIds.includes(id)));const first=possible[0]||ROUTES[0];let currentId=first.ids.find(id=>mode!=="wrong"||wrongIds.includes(id))||first.ids[0];return {schema:2,active:true,mode,answers:{},stats:previousStats||{},pins:[],currentFile:first.file,currentId,elapsedMs:0,timerRunning:true,timerStartedAt:now,wrongIds,createdAt:now,completed:false}}
 function launchMode(mode){const old=getProgress();if(mode==="wrong"){const r=getResult();const wrong=r&&Array.isArray(r.wrongIds)?r.wrongIds:[];if(!wrong.length){alert("暂无数据：上一次考试没有错题。");return}}
 if(old.active){if(!confirm("当前已有刷题进度。开始新模式将覆盖当前会话，但会保留首页已累计的正确率统计。是否继续？"))return}
-const p=makeProgress(mode,old.stats||{});if(mode==="exam"){const session=makeExamSession();session.elapsedMs=0;session.timerRunning=true;session.timerStartedAt=Date.now();writeKey(STORAGE_KEYS.exam,session)}else{removeKey(STORAGE_KEYS.exam)}
+const p=makeProgress(mode,old.stats||{});if(mode==="exam"){const session=makeExamSession();session.elapsedMs=0;session.timerRunning=true;session.timerStartedAt=Date.now();const firstExamId=session.questionOrders[p.currentFile]?.[0];if(firstExamId)p.currentId=firstExamId;p.openAtTop=true;writeKey(STORAGE_KEYS.exam,session)}else{delete p.openAtTop;removeKey(STORAGE_KEYS.exam)}
 if(!saveProgress(p))return;
 try{localStorage.setItem(STORAGE_KEYS.marker,"MuYanQuizV2")}catch(e){}
 location.href=p.currentFile}
